@@ -33,7 +33,7 @@ library(gitcreds)
 mypath <- "~/ECON370/ECON370dhs/econ370 project/"
 
 
-senegal.dhs <- read_dta(paste0(mypath, "SNBR71DT/SNBR71DT/SNBR71FL.dta")) %>% 
+senegal.dhs <- read_dta(paste0(mypath, "SNBR7IDT/SNBR7IDT/SNBR7IFL.dta")) %>% 
   filter(!is.na(midx)) %>% 
   filter(b5 == 1) %>% # Child is alive
   filter(v135 == 1) # Usual resident or visitor of Senegal
@@ -279,15 +279,17 @@ senegal.data[is.na(senegal.data)] <- 0
 
 Y = senegal.data$haz
 
-X <- tibble(senegal.data, enumerator_dummies, strata_dummies) %>%
-  select(!c(literacy, enumerator, strata)) %>%
+X <- senegal.data %>%
+  select(!c(haz)) %>%
   as.matrix()
+
 
 
 
 ##### OLS BENCHMARK -------------------------------------
 
-
+ols <- lm(Y ~ X)
+summary(ols)
 
 
 ##### RIDGE REGRESSION ----------------------------------
