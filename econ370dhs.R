@@ -19,6 +19,7 @@ library(fastDummies)
 library(rpart)
 library(rpart.plot)
 library(grf)
+library(broom)
 
 #ridge & lasso
 library(glmnet)
@@ -289,17 +290,85 @@ X <- senegal.data %>%
 ##### OLS BENCHMARK -------------------------------------
 
 ols <- lm(Y ~ X)
-summary(ols)
+summary <- summary(ols)
+p_values <- coef(summary)[, "Pr(>|t|)"]
+p_value_95 <- p_values <= 0.05 
+significant_var <- rownames(coef(summary))[p_value_95] %>%
+  print() ## which variables are statistically significant predictors of literacy (95% level)?
+coefficients <- coef(summary)[, "Estimate"]
+min_p_value <- which.min(p_values)
+lowest_p_value <- p_values[min_p_value]
+lowest_p_value_var <- rownames(coef(summary))[min_p_value] %>%
+  print() ## which variable has the lowest p-value? 
+lowest_p_value_coeff <- coefficients[min_p_value] %>% 
+  print() ## what is the OLS coefficient associated with that variable? 
+
+ols_df <- ols %>%
+  tidy() %>%
+  as.data.frame()
 
 
 ##### RIDGE REGRESSION ----------------------------------
 
-###### find out how to cross-validate ridge
+grid.lasso <- 10^seq(2, -1, length = 300) # this is optimal for visualizing the lasso cv
+grid.ridge <- 10^seq(5, -1, length = 300) # this is optimal for visualizing the ridge cv
+set.seed(8675309)
 
-ridge_low <- glmnet(X, Y, alpha = 0, lambda = 10^-3)
+ridge_cv <- cv.glmnet(X, Y, alpha = 0, lambda = grid.ridge)
+plot(ridge_cv)
 
+ridge_cv$lambda.min
+ridge_cv$lambda.1se
+min(ridge_cv$cvm)
+
+
+##### DOING RIDGE WITH LAMBDA MIN
+set.seed(8675309)
+ridge_cv_min <- predict(ridge_cv, type = "coefficients", s = ridge_cv$lambda.min) %>%
+  as.matrix() 
+
+ridge_cv_vars_min <- rownames(ridge_cv_min)[abs(ridge_cv_min) > mean(abs(ridge_cv_min)) &
+                                          rownames(ridge_cv_min) != "(Intercept)"]
+ridge_cv_vars_min # so as of right now, selecting those variables which (at the optimal lambda)
+              # have a coefficient (abs) greater than the mean of the coefficients (abs)
+              # which conceptually makes sense since regularization decreases magnitude of variables
+
+##### DOING RIDGE WITH LAMBDA 1SE
+set.seed(8675309)
+ridge_cv_1se <- predict(ridge_cv, type = "coefficients", s = ridge_cv$lambda.1se) %>%
+  as.matrix() 
+
+ridge_cv_vars_1se <- rownames(ridge_cv_1se)[abs(ridge_cv_1se) > mean(abs(ridge_cv_1se)) &
+                                              rownames(ridge_cv_1se) != "(Intercept)"]
+ridge_cv_vars_1se
 
 ##### LASSO REGRESSION ----------------------------------
+set.seed(8675309)
+lasso_cv <- cv.glmnet(X, Y, alpha = 1, lambda = grid.lasso)  
+plot(lasso_cv)
+
+lasso_cv$lambda.min
+lasso_cv$lambda.1se
+min(lasso_cv$cvm)
+
+##### DOING LASSO WITH LAMBDA MIN
+set.seed(8675309)
+lasso_cv_min <- predict(lasso_cv, type = "coefficients", s = lasso_cv$lambda.min) %>%
+  as.matrix()
+lasso_cv_vars <- rownames(lasso_cv_min)[lasso_cv_min != 0 &
+                                          rownames(lasso_cv_min) != "(Intercept)"]
+lasso_cv_vars
+
+##### DOING LASSO WITH LAMBDA 1SE
+set.seed(8675309)
+lasso_cv_1se <- predict(lasso_cv, type = "coefficients", s = lasso_cv$lambda.1se) %>%
+  as.matrix()
+lasso_cv_vars_1se <- rownames(lasso_cv_1se)[lasso_cv_1se != 0 &
+                                              rownames(lasso_cv_1se) != "(Intercept)"]
+lasso_cv_vars_1se
+
+##### DOING LASSO WITH DATA-DRIVEN PROCESS
+
 
 ##### RANDOM FOREST -------------------------------------
 
