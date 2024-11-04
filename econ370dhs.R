@@ -402,7 +402,7 @@ ridge_min_coefficients_graph <- ggplot(ridge_min_coefficients, aes(x = reorder(v
   labs(x = "Variables", y = "Absolute Coefficients", title = "Ridge Minimum Coefficients (Absolute Values)") +
   theme_minimal() +
   theme(axis.text.y = element_text(size = 10))
-
+ridge_min_coefficients_graph
 
 
 ##### DOING RIDGE WITH LAMBDA 1SE
@@ -436,6 +436,7 @@ lasso_cv_vars <- rownames(lasso_cv_min)[lasso_cv_min != 0 &
 lasso_cv_vars
 
 lasso_mse_min <- min(lasso_cv$cvm)
+lasso_mse_min
 
 ##### DOING LASSO WITH LAMBDA 1SE
 set.seed(8675309)
@@ -845,6 +846,13 @@ X.ethiopia.ridge <- ethiopia.data %>%
   as.matrix()   
 
 
+X.ethiopia.lasso <- ethiopia.data %>% 
+  select(!c(haz)) %>%
+  select(any_of(lasso_cv_vars)) %>% ##### these are the variables chosen by lasso with lambda.min
+  select(-matches("^(region_|ethnicity_)")) %>%
+  as.matrix()
+
+
 ols.ethiopia <- lm(Y.ethiopia ~ X.ethiopia)
 summary.ethiopia <- summary(ols.ethiopia)
 p_values.ethiopia <- coef(summary.ethiopia)[, "Pr(>|t|)"]
@@ -894,20 +902,43 @@ plot(ridge.ethiopia.test)
 ridge.ethiopia.nomodel <- predict(ridge.ethiopia.test, type = "coefficients", s = ridge.ethiopia.test$lambda.min)
 min(ridge.ethiopia.test$cvm)
 
-##### DOING RIDGE WITH LAMBDA MIN----------------
-set.seed(8675309)
-ridge_cv_min <- predict(ridge_cv, type = "coefficients", s = ridge_cv$lambda.min) %>%
-  as.matrix() 
-
-ridge_cv_vars_min <- rownames(ridge_cv_min)[abs(ridge_cv_min) > mean(abs(ridge_cv_min)) &
-                                              rownames(ridge_cv_min) != "(Intercept)"]
-ridge_cv_vars_min # so as of right now, selecting those variables which (at the optimal lambda)
-# have a coefficient (abs) greater than the mean of th
 
 
 
+##### DOING LASSO.MIN---------------------------------
+grid.lasso.ethiopia <- 10^seq(2, -1, length = 300)
+set.seed(8675398)
 
+# first doing it with the variables chosen by the model (lasso_cv_vars)
+lasso.ethiopia <- cv.glmnet(X.ethiopia.lasso, Y.ethiopia, alpha = 1, lambda = grid.lasso.ethiopia)
+plot(lasso.ethiopia)
 
+min.lasso.ethiopia.mse <- min(lasso.ethiopia$cvm)
+min.lasso.ethiopia.mse
+
+lasso.ethiopia.min <- predict(lasso.ethiopia, type = "coefficients", s = lasso.ethiopia$lambda.min) %>%
+  as.matrix()
+lasso.ethiopia.min
+
+lasso.ethiopia.vars <- rownames(lasso.ethiopia.min)[lasso.ethiopia.min != 0 &
+                                          rownames(lasso.ethiopia.min) != "(Intercept)"]
+lasso.ethiopia.vars
+lasso.ethiopia.coef <- as.matrix(coef(lasso.ethiopia))
+
+lasso.ethiopia.dropped <- rownames(lasso.ethiopia.coef)[!rownames(lasso.ethiopia.coef) %in% lasso.ethiopia.vars]
+lasso.ethiopia.dropped
+
+# now doing it without the model, just applying it straight up!
+
+lasso.ethiopia.nomodel <- cv.glmnet(X.ethiopia.nomods, Y.ethiopia, alpha = 1, lambda = grid.lasso.ethiopia)
+plot(lasso.ethiopia.nomodel)
+lasso.ethiopia.model.coef <- predict(lasso.ethiopia.nomodel, type = "coefficients", s = lasso.ethiopia.nomodel$lambda.min) %>%
+  as.matrix()
+min(lasso.ethiopia.nomodel$cvm)
+
+lasso.ethiopia.nomodel.vars <- rownames(lasso.ethiopia.model.coef)[lasso.ethiopia.model.coef != 0 &
+                                                                     rownames(lasso.ethiopia.model.coef) != "(Intercept)"]
+lasso.ethiopia.nomodel.vars
 
 ###### DOING LASSO WITH DATA-DRIVEN PROCESS-----------------------
 set.seed(8675309)
@@ -922,16 +953,30 @@ lasso_ddf_vars_dropped
 
 
 common_vars <- intersect(lasso_dd_vars, lasso_ddf_vars)
+common_vars_lassomin <- intersect(lasso_cv_vars, lasso.ethiopia.vars)
 
+max_length <- max(length(lasso_dd_vars), length(lasso_cv_vars), length(ridge_top_decile))
+
+# Function to extend a vector to max_length with NAs if needed
+pad_with_na <- function(vec, max_length) {
+  length(vec) <- max_length
+  return(vec)
+}
+
+# Pad each vector with NA to ensure they have the same length
 comparison_table <- tibble(
-  Senegal.Lasso.Variables = lasso_dd_vars,
-  Ethiopia.Lasso.Variables = ifelse(lasso_dd_vars %in% common_vars, lasso_dd_vars, NA),
-  Dropped.Variables = ifelse(lasso_dd_vars %in% lasso_ddf_vars_dropped, lasso_dd_vars, NA)
+  Senegal.Lasso.DD.Variables = pad_with_na(lasso_dd_vars, max_length),
+  Ethiopia.Lasso.DD.Variables = pad_with_na(ifelse(lasso_dd_vars %in% common_vars, lasso_dd_vars, NA), max_length),
+  Dropped.DD.Variables = pad_with_na(ifelse(lasso_dd_vars %in% lasso_ddf_vars_dropped, lasso_dd_vars, NA), max_length),
+  Senegal.Lasso.Min.Variables = pad_with_na(lasso_cv_vars, max_length),
+  Ethiopia.Lasso.Min.Variables = pad_with_na(ifelse(lasso_cv_vars %in% common_vars_lassomin, lasso_cv_vars, NA), max_length),
+  Dropped.Lasso.Min.Variables = pad_with_na(ifelse(lasso_cv_vars %in% lasso.ethiopia.dropped, lasso_cv_vars, NA), max_length),
+  Ridge.TopDecile.Variables = pad_with_na(ridge_top_decile, max_length)
 )
 
 table_plot <- tableGrob(comparison_table)
 table_plot
-ggsave("data_frame_table.png", plot = table_plot, width = 7, height = 15, dpi = 300)
+ggsave("data_frame_table.png", plot = table_plot, width = 18, height = 40, dpi = 300)
 
 
 lasso_ddf_predict <- predict(lasso_ddf)
