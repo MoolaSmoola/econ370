@@ -1,5 +1,9 @@
-# Test
-# change
+## ECON 370 PROJECT 2
+## NAME: Benet Ge & Weiran Jiang
+## DATE: 11/6/24
+
+##### LIBRARIES ---------------------------------
+
 # install.packages('gitcreds')
 # install.packages("tidyverse")
 # install.packages("haven") 
@@ -25,20 +29,18 @@ library(broom)
 library(glmnet)
 library(hdm)
 
-######### INSERT PCA PACKAGE #######
-#pca()
-
 library(gitcreds)
 # gitcreds_set()
 
-mypath <- "~/ECON370/ECON370dhs/econ370 project/"
+######### INSERT PCA PACKAGE #######
+#pca()
 
+mypath <- "~/ECON370/ECON370dhs/econ370 project/"
 
 senegal.dhs <- read_dta(paste0(mypath, "SNBR7IDT/SNBR7IDT/SNBR7IFL.dta")) %>% 
   filter(!is.na(midx)) %>% 
   filter(b5 == 1) %>% # Child is alive
   filter(v135 == 1) # Usual resident or visitor of Senegal
-
 
 senegal.data <- senegal.dhs %>% 
   select(hw70, hw1, bord, b0, b1, b2, b4, b11, 
@@ -359,6 +361,7 @@ lasso_cv_vars <- rownames(lasso_cv_min)[lasso_cv_min != 0 &
                                           rownames(lasso_cv_min) != "(Intercept)"]
 lasso_cv_vars
 
+
 ##### DOING LASSO WITH LAMBDA 1SE
 set.seed(8675309)
 lasso_cv_1se <- predict(lasso_cv, type = "coefficients", s = lasso_cv$lambda.1se) %>%
@@ -375,6 +378,7 @@ lasso_dd_coeff <- as.matrix(coef(lasso_dd))
 lasso_dd_vars <- rownames(lasso_dd_coeff)[lasso_dd_coeff != 0 &
                                             rownames(lasso_dd_coeff) != "(Intercept)"]
 lasso_dd_vars
+
 
 ##### REGRESSION TREE -----------------------------------
 set.seed(8675309)
@@ -395,23 +399,23 @@ tree_mse = mean(as.numeric(unlist((yhat - haz_test)^2)))
 #### YOU HAVE TO RENAME IT TO SENEGAL_RF #####
 
 set.seed(8675309)
-emerge_rf <- randomForest(haz ~ .,  
+senegal.rf <- randomForest(haz ~ .,  
                           data = senegal.data, 
                           subset = train,
                           mtry = 21, # about the sqrt(X = 426) # default 500 trees
                           importance = TRUE) 
-emerge_rf
-yhat_rf <- predict(emerge_rf, newdata = senegal.data[-train, ])
+senegal.rf
+yhat_rf <- predict(senegal.rf, newdata = senegal.data[-train, ])
 rf_mse = mean((yhat_rf - haz_test)^2)
 rf_mse
 rf_mse <= tree_mse # the rf MSE is less than the test MSE from a single tree
 
-senegal_rf_variables <- importance(emerge_rf) %>% 
+senegal_rf_variables <- importance(senegal.rf) %>% 
   as.data.frame() %>%
   arrange(desc(`%IncMSE`))
 
-included <- rownames(senegal_rf_variables)[senegal_rf_variables$`%IncMSE` > mean(senegal_rf_variables$`%IncMSE`)]
-included
+rf_vars <- rownames(senegal_rf_variables)[senegal_rf_variables$`%IncMSE` > mean(senegal_rf_variables$`%IncMSE`)]
+rf_vars
 
 
 ##### GRADIENT-BOOSTED FOREST ---------------------------
@@ -426,8 +430,11 @@ senegal_boost <- gbm(haz ~ ., data = senegal.data[train, ],
 gbf <- summary(senegal_boost)
 gbf_variables <- tibble(influence = gbf$rel.inf,
                         variable = gbf$var)
+
 gbf_variables_select <- gbf_variables %>%
   filter(influence > mean(influence))
+
+gbf_vars <- gbf_variables_select$variable
 
 
 yhat_boost <- predict(senegal_boost, 
@@ -438,6 +445,28 @@ boost_mse
 
 
 ##### PRINCIPAL COMPONENT ANALYSIS  ---------------------
+
+
+
+##### ETHIOPIA MODEL ------------------------------------
+
+# maybe I can try a thing where I see which variables crop up the most
+# maybe I can make a dataframe that stores the variables from each method in a vector.
+
+
+collected_variables <- c(Ridge.Minimum = ridge_cv_vars_min,
+                                  Ridge.1se = ridge_cv_vars_1se,
+                                  Lasso.Minimum = lasso_cv_vars,
+                                  Lasso.1se = lasso_cv_vars_1se,
+                                  Lasso.DataDriven = lasso_dd_vars,
+                                  Random.Forest = rf_vars,
+                                  Gradient.Boosted.Forest = gbf_vars)
+
+frequency_vars <- table(collected_variables) %>% 
+  as.data.frame()
+frequency_vars <- frequency_vars %>%
+  arrange(desc(frequency_vars$Freq))
+
 
 
 
