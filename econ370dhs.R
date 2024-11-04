@@ -552,7 +552,7 @@ lasso_dd_frequency <- frequency_vars %>%
 
 # or cross-validate the non-regularization techniques ( which would be insane )
 
-
+##Benet Filepath
 mypath <- "~/ECON370/ECON370dhs/econ370 project/"
 
 ethiopia.dhs <- read_dta(paste0(mypath, "Ethiopia2016/ETBR71FL.dta")) %>% 
@@ -560,7 +560,13 @@ ethiopia.dhs <- read_dta(paste0(mypath, "Ethiopia2016/ETBR71FL.dta")) %>%
   filter(b5 == 1) %>% # Child is alive
   filter(v135 == 1) # Usual resident or visitor of Ethiopia
 
+#Weiran Filepath
+mypath <- "/Users/weiran/Data\ Science\ in\ Econ/PredictingInfantProject/Econ370Project2/Ethiopia2016/"
 
+ethiopia.dhs <- read_dta(paste0(mypath, "ETBR71FL.DTA")) %>% 
+  filter(!is.na(midx)) %>% 
+  filter(b5 == 1) %>% # Child is alive
+  filter(v135 == 1) # Usual resident or visitor of Ethiopia
 
 ethiopia.data <- ethiopia.dhs %>% 
   select(hw70, hw1, bord, b0, b1, b2, b4, b11, 
@@ -818,4 +824,16 @@ ethiopia.predictions <- predict(ols.ethiopia)
 ethiopia.ols.mse <- mean((Y.ethiopia - ethiopia.predictions)^2)
 ethiopia.ols.mse
 
+##### Final Model--------------------------------------
+##### DOING LASSO WITH DATA-DRIVEN PROCESS
+set.seed(8675309)
+lasso_ddf <- rlasso(Y ~ X, post = FALSE)
+summary(lasso_ddf)
+lasso_ddf_coeff <- as.matrix(coef(lasso_ddf))
+lasso_ddf_vars <- rownames(lasso_ddf_coeff)[lasso_ddf_coeff != 0 &
+                                            rownames(lasso_ddf_coeff) != "(Intercept)"]
+lasso_ddf_vars
 
+lasso_ddf_predict <- predict(lasso_ddf)
+lasso_ddf_mse <- mean((Y - lasso_ddf_predict)^2)
+lasso_ddf_mse
