@@ -368,11 +368,75 @@ lasso_cv_vars_1se <- rownames(lasso_cv_1se)[lasso_cv_1se != 0 &
 lasso_cv_vars_1se
 
 ##### DOING LASSO WITH DATA-DRIVEN PROCESS
+set.seed(8675309)
+lasso_dd <- rlasso(Y ~ X, post = FALSE)
+summary(lasso_dd)
+lasso_dd_coeff <- as.matrix(coef(lasso_dd))
+lasso_dd_vars <- rownames(lasso_dd_coeff)[lasso_dd_coeff != 0 &
+                                            rownames(lasso_dd_coeff) != "(Intercept)"]
+lasso_dd_vars
 
+##### REGRESSION TREE -----------------------------------
+set.seed(8675309)
+train <- sample(1:nrow(senegal.data), 0.4 * (nrow(senegal.data))) ### why 40%
+
+
+mytree <- tree(haz ~ ., senegal.data, subset = train)
+summary(mytree)
+plot(mytree)
+text(mytree, pretty = 0)
+
+yhat <- predict(mytree, newdata = senegal.data[-train, ])
+haz_test <- unlist(senegal.data[-train, "haz"])
+tree_mse = mean(as.numeric(unlist((yhat - haz_test)^2)))
 
 ##### RANDOM FOREST -------------------------------------
 
+#### YOU HAVE TO RENAME IT TO SENEGAL_RF #####
+
+set.seed(8675309)
+emerge_rf <- randomForest(haz ~ .,  
+                          data = senegal.data, 
+                          subset = train,
+                          mtry = 21, # about the sqrt(X = 426) # default 500 trees
+                          importance = TRUE) 
+emerge_rf
+yhat_rf <- predict(emerge_rf, newdata = senegal.data[-train, ])
+rf_mse = mean((yhat_rf - haz_test)^2)
+rf_mse
+rf_mse <= tree_mse # the rf MSE is less than the test MSE from a single tree
+
+senegal_rf_variables <- importance(emerge_rf) %>% 
+  as.data.frame() %>%
+  arrange(desc(`%IncMSE`))
+
+included <- rownames(senegal_rf_variables)[senegal_rf_variables$`%IncMSE` > mean(senegal_rf_variables$`%IncMSE`)]
+included
+
+
 ##### GRADIENT-BOOSTED FOREST ---------------------------
+set.seed(8675309)
+senegal_boost <- gbm(haz ~ ., data = senegal.data[train, ], 
+                    distribution = "gaussian", 
+                    n.trees = 5000, 
+                    interaction.depth = 2, 
+                    shrinkage = 0.001, 
+                    verbose = F)
+
+gbf <- summary(senegal_boost)
+gbf_variables <- tibble(influence = gbf$rel.inf,
+                        variable = gbf$var)
+gbf_variables_select <- gbf_variables %>%
+  filter(influence > mean(influence))
+
+
+yhat_boost <- predict(senegal_boost, 
+                      newdata = senegal.data[-train, ], 
+                      n.trees = 5000)
+boost_mse = mean((yhat_boost - haz_test)^2)
+boost_mse
+
+
 
 ##### PRINCIPAL COMPONENT ANALYSIS  ---------------------
 
