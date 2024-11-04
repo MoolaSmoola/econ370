@@ -24,6 +24,8 @@ library(rpart)
 library(rpart.plot)
 library(grf)
 library(broom)
+library(ggplot2)
+library(gridExtra)
 
 #ridge & lasso
 library(glmnet)
@@ -381,6 +383,27 @@ ridge_cv_vars_min # so as of right now, selecting those variables which (at the 
 
 ridge_mse_min <- min(ridge_cv$cvm)
 
+ridge_min_coefficients <- tibble(variables = rownames(ridge_cv_min),
+                                 coefficients = ridge_cv_min)
+ridge_min_coefficients <- ridge_min_coefficients %>%
+  arrange(desc(abs(coefficients)))
+
+ridge_min_coefficients$coefficients <- as.numeric(ridge_min_coefficients$coefficients)
+
+top_decile_threshold <- quantile(abs(ridge_min_coefficients$coefficients), 0.9)
+
+ridge_min_coefficients <- ridge_min_coefficients %>%
+  mutate(in_top_decile = abs(coefficients) >= top_decile_threshold)
+
+
+ridge_min_coefficients_graph <- ggplot(ridge_min_coefficients, aes(x = reorder(variables, abs(coefficients)), y = abs(coefficients), fill = in_top_decile)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("FALSE" = "orange", "TRUE" = "red")) +  # Use orange for non-top decile, red for top decile
+  labs(x = "Variables", y = "Absolute Coefficients", title = "Ridge Minimum Coefficients (Absolute Values)") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 10))
+
+
 
 ##### DOING RIDGE WITH LAMBDA 1SE
 set.seed(8675309)
@@ -547,10 +570,13 @@ collected_MSE <- list(ridge_mse_min,
 mse_comparison <- tibble(Method = names(collected_variables_names),
                          MSE = collected_MSE) ##### data-driven lasso the least
 
+mse_comparison$MSE <- as.numeric(mse_comparison$MSE)
+mse_viable <- mse_comparison$Method[mse_comparison$MSE < mean(mse_comparison$MSE)]
+mse_viable 
+
 lasso_dd_frequency <- frequency_vars %>%
   filter(collected_variables %in% lasso_dd_vars)
 
-# or cross-validate the non-regularization techniques ( which would be insane )
 
 ##Benet Filepath
 mypath <- "~/ECON370/ECON370dhs/econ370 project/"
@@ -801,6 +827,23 @@ X.ethiopia <- ethiopia.data %>% # This is the model... i suppose.
   select(!c(region_1, region_10, ethnicity_6)) %>%
   as.matrix() # still need to clean this heavily
 
+X.ethiopia.nomods <- ethiopia.data %>%
+  select(!c(haz)) %>%
+  as.matrix()
+
+ridge_top_decile <- ridge_min_coefficients %>%
+  filter(abs(coefficients) >= top_decile_threshold) %>%
+  pull(variables) %>% tibble(Variable = .)
+
+ridge_top_decile <- ridge_top_decile$Variable  # Convert to a character vector if it is a data frame
+
+# Select columns in ethiopia.data based on ridge_top_decile and exclude those starting with "region_" or "ethnicity_"
+X.ethiopia.ridge <- ethiopia.data %>%
+  select(-haz) %>%                                # Exclude the 'haz' column
+  select(any_of(ridge_top_decile)) %>%            # Select only columns in ridge_top_decile
+  select(-matches("^(region_|ethnicity_)")) %>%   # Exclude columns starting with "region_" or "ethnicity_"
+  as.matrix()   
+
 
 ols.ethiopia <- lm(Y.ethiopia ~ X.ethiopia)
 summary.ethiopia <- summary(ols.ethiopia)
@@ -824,16 +867,73 @@ ethiopia.predictions <- predict(ols.ethiopia)
 ethiopia.ols.mse <- mean((Y.ethiopia - ethiopia.predictions)^2)
 ethiopia.ols.mse
 
+
+
+
+
+
+
 ##### Final Model--------------------------------------
-##### DOING LASSO WITH DATA-DRIVEN PROCESS
+
+###### DOING RIDGE.MIN --------------------------------
+grid.ridge.ethiopia <- 10^seq(5, 1, length = 300) # this is optimal for visualizing the ridge cv
 set.seed(8675309)
-lasso_ddf <- rlasso(Y ~ X, post = FALSE)
+
+ridge.ethiopia <- cv.glmnet(X.ethiopia.ridge, Y.ethiopia, alpha = 0, lambda = grid.ridge.ethiopia)
+plot(ridge.ethiopia)
+
+min.ridge.ethiopia.mse <- min(ridge.ethiopia$cvm)
+min.ridge.ethiopia.mse
+
+ridge.ethiopia.min <- predict(ridge.ethiopia, type = "coefficients", s = ridge.ethiopia$lambda.min)
+ridge.ethiopia.min
+
+
+ridge.ethiopia.test <- cv.glmnet(X.ethiopia.nomods, Y.ethiopia, alpha = 0, lambda = grid.ridge.ethiopia)
+plot(ridge.ethiopia.test)
+ridge.ethiopia.nomodel <- predict(ridge.ethiopia.test, type = "coefficients", s = ridge.ethiopia.test$lambda.min)
+min(ridge.ethiopia.test$cvm)
+
+##### DOING RIDGE WITH LAMBDA MIN----------------
+set.seed(8675309)
+ridge_cv_min <- predict(ridge_cv, type = "coefficients", s = ridge_cv$lambda.min) %>%
+  as.matrix() 
+
+ridge_cv_vars_min <- rownames(ridge_cv_min)[abs(ridge_cv_min) > mean(abs(ridge_cv_min)) &
+                                              rownames(ridge_cv_min) != "(Intercept)"]
+ridge_cv_vars_min # so as of right now, selecting those variables which (at the optimal lambda)
+# have a coefficient (abs) greater than the mean of th
+
+
+
+
+
+
+###### DOING LASSO WITH DATA-DRIVEN PROCESS-----------------------
+set.seed(8675309)
+lasso_ddf <- rlasso(Y.ethiopia ~ X.ethiopia, post = FALSE)
 summary(lasso_ddf)
 lasso_ddf_coeff <- as.matrix(coef(lasso_ddf))
 lasso_ddf_vars <- rownames(lasso_ddf_coeff)[lasso_ddf_coeff != 0 &
                                             rownames(lasso_ddf_coeff) != "(Intercept)"]
 lasso_ddf_vars
+lasso_ddf_vars_dropped <- rownames(lasso_ddf_coeff)[!rownames(lasso_ddf_coeff) %in% lasso_ddf_vars]
+lasso_ddf_vars_dropped
+
+
+common_vars <- intersect(lasso_dd_vars, lasso_ddf_vars)
+
+comparison_table <- tibble(
+  Senegal.Lasso.Variables = lasso_dd_vars,
+  Ethiopia.Lasso.Variables = ifelse(lasso_dd_vars %in% common_vars, lasso_dd_vars, NA),
+  Dropped.Variables = ifelse(lasso_dd_vars %in% lasso_ddf_vars_dropped, lasso_dd_vars, NA)
+)
+
+table_plot <- tableGrob(comparison_table)
+table_plot
+ggsave("data_frame_table.png", plot = table_plot, width = 7, height = 15, dpi = 300)
+
 
 lasso_ddf_predict <- predict(lasso_ddf)
-lasso_ddf_mse <- mean((Y - lasso_ddf_predict)^2)
+lasso_ddf_mse <- mean((Y.ethiopia - lasso_ddf_predict)^2)
 lasso_ddf_mse
