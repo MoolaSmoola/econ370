@@ -748,6 +748,7 @@ Y.ethiopia = ethiopia.data$haz
 X.ethiopia <- ethiopia.data %>%
   select(!c(haz)) %>% ### select the variables selected by the lasso-data.driven
   select(any_of(lasso_dd_vars)) %>% #### but... what do we do when regions aren't the same!
+  select(!c(region_1, region_10, ethnicity_6)) %>%
   as.matrix() # still need to clean this heavily
 
 
