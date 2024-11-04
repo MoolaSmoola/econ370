@@ -35,6 +35,7 @@ library(gitcreds)
 ######### INSERT PCA PACKAGE #######
 #pca()
 
+##Benet File Path
 mypath <- "~/ECON370/ECON370dhs/econ370 project/"
 
 senegal.dhs <- read_dta(paste0(mypath, "SNBR7IDT/SNBR7IDT/SNBR7IFL.dta")) %>% 
@@ -42,6 +43,15 @@ senegal.dhs <- read_dta(paste0(mypath, "SNBR7IDT/SNBR7IDT/SNBR7IFL.dta")) %>%
   filter(b5 == 1) %>% # Child is alive
   filter(v135 == 1) # Usual resident or visitor of Senegal
 
+##Weiran File Path
+#mypath<- "/Users/weiran/Data\ Science\ in\ Econ/PredictingInfantProject/Econ370Project2/"
+
+#senegal.dhs <- read_dta(paste0(mypath, "SNBR7IFL.DTA")) %>% 
+  #filter(!is.na(midx)) %>% 
+  #filter(b5 == 1) %>% 
+  #filter(v135 == 1)
+
+##Clean Dataset
 senegal.data <- senegal.dhs %>% 
   select(hw70, hw1, bord, b0, b1, b2, b4, b11, 
          v012, v024, v025, v113, v116, v119, v133,
