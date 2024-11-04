@@ -745,12 +745,11 @@ ethiopia.data[is.na(ethiopia.data)] <- 0
 
 Y.ethiopia = ethiopia.data$haz
 
-X.ethiopia <- ethiopia.data %>%
+X.ethiopia <- ethiopia.data %>% # This is the model... i suppose.
   select(!c(haz)) %>% ### select the variables selected by the lasso-data.driven
   select(any_of(lasso_dd_vars)) %>% #### but... what do we do when regions aren't the same!
   select(!c(region_1, region_10, ethnicity_6)) %>%
   as.matrix() # still need to clean this heavily
-
 
 
 ols.ethiopia <- lm(Y.ethiopia ~ X.ethiopia)
@@ -774,3 +773,5 @@ ols_df.ethiopia <- ols.ethiopia %>%
 ethiopia.predictions <- predict(ols.ethiopia)
 ethiopia.ols.mse <- mean((Y.ethiopia - ethiopia.predictions)^2)
 ethiopia.ols.mse
+
+
