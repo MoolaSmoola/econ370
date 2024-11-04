@@ -335,6 +335,9 @@ ridge_cv_vars_min # so as of right now, selecting those variables which (at the 
               # have a coefficient (abs) greater than the mean of the coefficients (abs)
               # which conceptually makes sense since regularization decreases magnitude of variables
 
+ridge_mse_min <- min(ridge_cv$cvm)
+
+
 ##### DOING RIDGE WITH LAMBDA 1SE
 set.seed(8675309)
 ridge_cv_1se <- predict(ridge_cv, type = "coefficients", s = ridge_cv$lambda.1se) %>%
@@ -343,6 +346,10 @@ ridge_cv_1se <- predict(ridge_cv, type = "coefficients", s = ridge_cv$lambda.1se
 ridge_cv_vars_1se <- rownames(ridge_cv_1se)[abs(ridge_cv_1se) > mean(abs(ridge_cv_1se)) &
                                               rownames(ridge_cv_1se) != "(Intercept)"]
 ridge_cv_vars_1se
+
+lambda_1se_index <- which(ridge_cv$lambda == ridge_cv$lambda.1se)
+ridge_mse_1se <- ridge_cv$cvm[lambda_1se_index]
+ridge_mse_1se
 
 ##### LASSO REGRESSION ----------------------------------
 set.seed(8675309)
@@ -361,6 +368,7 @@ lasso_cv_vars <- rownames(lasso_cv_min)[lasso_cv_min != 0 &
                                           rownames(lasso_cv_min) != "(Intercept)"]
 lasso_cv_vars
 
+lasso_mse_min <- min(lasso_cv$cvm)
 
 ##### DOING LASSO WITH LAMBDA 1SE
 set.seed(8675309)
@@ -369,6 +377,10 @@ lasso_cv_1se <- predict(lasso_cv, type = "coefficients", s = lasso_cv$lambda.1se
 lasso_cv_vars_1se <- rownames(lasso_cv_1se)[lasso_cv_1se != 0 &
                                               rownames(lasso_cv_1se) != "(Intercept)"]
 lasso_cv_vars_1se
+
+lasso_1se_index <- which(lasso_cv$lambda == lasso_cv$lambda.1se)
+lasso_mse_1se <- lasso_cv$cvm[lasso_1se_index]
+lasso_mse_1se
 
 ##### DOING LASSO WITH DATA-DRIVEN PROCESS
 set.seed(8675309)
@@ -379,6 +391,9 @@ lasso_dd_vars <- rownames(lasso_dd_coeff)[lasso_dd_coeff != 0 &
                                             rownames(lasso_dd_coeff) != "(Intercept)"]
 lasso_dd_vars
 
+lasso_dd_predict <- predict(lasso_dd)
+lasso_dd_mse <- mean((Y - lasso_dd_predict)^2)
+lasso_dd_mse
 
 ##### REGRESSION TREE -----------------------------------
 set.seed(8675309)
@@ -403,6 +418,7 @@ senegal.rf <- randomForest(haz ~ .,
                           data = senegal.data, 
                           subset = train,
                           mtry = 21, # about the sqrt(X = 426) # default 500 trees
+                          ntree = 1000, # because X = 426 we want to ensure each is used
                           importance = TRUE) 
 senegal.rf
 yhat_rf <- predict(senegal.rf, newdata = senegal.data[-train, ])
@@ -451,8 +467,6 @@ boost_mse
 ##### ETHIOPIA MODEL ------------------------------------
 
 # maybe I can try a thing where I see which variables crop up the most
-# maybe I can make a dataframe that stores the variables from each method in a vector.
-
 
 collected_variables <- c(Ridge.Minimum = ridge_cv_vars_min,
                                   Ridge.1se = ridge_cv_vars_1se,
@@ -466,6 +480,36 @@ frequency_vars <- table(collected_variables) %>%
   as.data.frame()
 frequency_vars <- frequency_vars %>%
   arrange(desc(frequency_vars$Freq))
+
+collected_variables_names <- list(
+  Ridge.Minimum = ridge_cv_vars_min,
+  Ridge.1se = ridge_cv_vars_1se,
+  Lasso.Minimum = lasso_cv_vars,
+  Lasso.1se = lasso_cv_vars_1se,
+  Lasso.DataDriven = lasso_dd_vars,
+  Random.Forest = rf_vars,
+  Gradient.Boosted.Forest = gbf_vars
+)
+
+collected_MSE <- list(ridge_mse_min,
+                      ridge_mse_1se,
+                      lasso_mse_min,
+                      lasso_mse_1se,
+                      lasso_dd_mse,
+                      rf_mse,
+                      boost_mse
+)
+
+mse_comparison <- tibble(Method = names(collected_variables_names),
+                         MSE = collected_MSE) ##### data-driven lasso the least
+
+lasso_dd_frequency <- frequency_vars %>%
+  filter(collected_variables %in% lasso_dd_vars)
+
+
+
+# or cross-validate the non-regularization techniques: 
+
 
 
 
