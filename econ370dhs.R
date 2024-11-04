@@ -286,8 +286,40 @@ senegal.data <- dummy_cols(senegal.data, select_columns = factor_cols, remove_se
 senegal.data[is.na(senegal.data)] <- 0
 
 ###### Principal Component Analysis --------------------
+#install.packages("prcomp")
+senegal.data <- senegal.data[, sapply(senegal.data, function(col) var(col, na.rm = TRUE) > 0)]
+pca_result <- prcomp(senegal.data, scale. = TRUE)
+
+# Check the results
+summary(pca_result)
 
 
+var_explained <- pca_result$sdev^2 / sum(pca_result$sdev^2) * 100
+plot(var_explained, type = "b", 
+     main = "Scree Plot for Full PCA with Variance Explained", 
+     xlab = "Principal Components", 
+     ylab = "Percentage of Variance Explained", 
+     ylim = c(0, max(var_explained) + 5))  
+text(1:length(var_explained), var_explained, 
+     labels = round(var_explained, 1), 
+     pos = 3, cex = 0.8)
+
+biplot(pca_result, scale = 0, cex = 0.6, 
+       col = c("black", "red"), 
+       xlabs = rep("•", nrow(pca_result$x)),  
+       xlim = c(-5, 5),  
+       ylim = c(-5, 5))  
+
+
+par(mfrow = c(1, 3), mar = c(10, 4, 4, 2) + 0.1)  
+for (i in 1:3) {
+  barplot(pca_result$rotation[, i], 
+          las = 2,                
+          cex.names = 0.7,        
+          main = paste("Full PC", i, "Loadings"), 
+          ylab = "Loadings", 
+          xlab = "Variables")
+}  
 
 
 ##### PREPARE DATA --------------------------------------
