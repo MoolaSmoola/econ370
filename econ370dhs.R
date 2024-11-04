@@ -36,20 +36,20 @@ library(gitcreds)
 #pca()
 
 ##Benet File Path
-mypath <- "~/ECON370/ECON370dhs/econ370 project/"
+#mypath <- "~/ECON370/ECON370dhs/econ370 project/"
 
-senegal.dhs <- read_dta(paste0(mypath, "SNBR7IDT/SNBR7IDT/SNBR7IFL.dta")) %>% 
-  filter(!is.na(midx)) %>% 
-  filter(b5 == 1) %>% # Child is alive
-  filter(v135 == 1) # Usual resident or visitor of Senegal
+#senegal.dhs <- read_dta(paste0(mypath, "SNBR7IDT/SNBR7IDT/SNBR7IFL.dta")) %>% 
+  #filter(!is.na(midx)) %>% 
+  #filter(b5 == 1) %>% # Child is alive
+  #filter(v135 == 1) # Usual resident or visitor of Senegal
 
 ##Weiran File Path
-#mypath<- "/Users/weiran/Data\ Science\ in\ Econ/PredictingInfantProject/Econ370Project2/"
+mypath<- "/Users/weiran/Data\ Science\ in\ Econ/PredictingInfantProject/Econ370Project2/"
 
-#senegal.dhs <- read_dta(paste0(mypath, "SNBR7IFL.DTA")) %>% 
-  #filter(!is.na(midx)) %>% 
-  #filter(b5 == 1) %>% 
-  #filter(v135 == 1)
+senegal.dhs <- read_dta(paste0(mypath, "SNBR7IFL.DTA")) %>% 
+  filter(!is.na(midx)) %>% 
+  filter(b5 == 1) %>% 
+  filter(v135 == 1)
 
 ##Clean Dataset
 senegal.data <- senegal.dhs %>% 
@@ -284,6 +284,8 @@ factor_cols <- c("mob",
 senegal.data[factor_cols] <- lapply(senegal.data[factor_cols], as.character)
 senegal.data <- dummy_cols(senegal.data, select_columns = factor_cols, remove_selected_columns = TRUE)
 senegal.data[is.na(senegal.data)] <- 0
+
+###### Principal Component Analysis --------------------
 
 
 
