@@ -824,8 +824,17 @@ Y.ethiopia = ethiopia.data$haz
 X.ethiopia <- ethiopia.data %>% # This is the model... i suppose.
   select(!c(haz)) %>% ### select the variables selected by the lasso-data.driven
   select(any_of(lasso_dd_vars)) %>% #### but... what do we do when regions aren't the same!
-  select(!c(region_1, region_10, ethnicity_6)) %>%
+  select(!c(region_1, region_10, ethnicity_6)) %>% ##### now add a
   as.matrix() # still need to clean this heavily
+
+X.ethiopia <- ethiopia.data %>%
+  select(!c(haz, age_months)) %>%                                # Remove the 'haz' variable
+  select(any_of(lasso_dd_vars)) %>%                  # Select variables chosen by lasso
+  select(!c(region_1, region_10, ethnicity_6)) %>%   # Remove specific regions and ethnicity
+  cbind(ethiopia.data %>% 
+          select((c(region_3, region_5, region_7, ethnicity_5, ethnicity_19, ethnicity_28)))) %>%  # Add specified variables from ethiopia.data
+  as.matrix()  
+
 
 X.ethiopia.nomods <- ethiopia.data %>%
   select(!c(haz)) %>%
@@ -842,6 +851,8 @@ X.ethiopia.ridge <- ethiopia.data %>%
   select(-haz) %>%                                # Exclude the 'haz' column
   select(any_of(ridge_top_decile)) %>%            # Select only columns in ridge_top_decile
   select(-matches("^(region_|ethnicity_)")) %>%   # Exclude columns starting with "region_" or "ethnicity_"
+  cbind(ethiopia.data %>% 
+          select((c(region_3, region_5, region_7, ethnicity_5, ethnicity_19, ethnicity_28)))) %>% 
   as.matrix()   
 
 
@@ -849,6 +860,8 @@ X.ethiopia.lasso <- ethiopia.data %>%
   select(!c(haz)) %>%
   select(any_of(lasso_cv_vars)) %>% ##### these are the variables chosen by lasso with lambda.min
   select(-matches("^(region_|ethnicity_)")) %>%
+  cbind(ethiopia.data %>% 
+          select((c(region_3, region_5, region_7, ethnicity_5, ethnicity_19, ethnicity_28)))) %>% 
   as.matrix()
 
 
@@ -873,11 +886,6 @@ ols_df.ethiopia <- ols.ethiopia %>%
 ethiopia.predictions <- predict(ols.ethiopia)
 ethiopia.ols.mse <- mean((Y.ethiopia - ethiopia.predictions)^2)
 ethiopia.ols.mse
-
-
-
-
-
 
 
 ##### Final Model--------------------------------------
@@ -972,10 +980,6 @@ comparison_table <- tibble(
   Dropped.Lasso.Min.Variables = pad_with_na(ifelse(lasso_cv_vars %in% lasso.ethiopia.dropped, lasso_cv_vars, NA), max_length),
   Ridge.TopDecile.Variables = pad_with_na(ridge_top_decile, max_length)
 )
-
-table_plot <- tableGrob(comparison_table)
-table_plot
-ggsave("data_frame_table.png", plot = table_plot, width = 18, height = 40, dpi = 300)
 
 table_plot <- tableGrob(comparison_table, theme = ttheme_default(base_size = 16))
 ggsave("data_frame_table.png", plot = table_plot, width = 24, height = 50, dpi = 300, limitsize = FALSE)
