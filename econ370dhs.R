@@ -907,7 +907,7 @@ ridge.ethiopia.min
 ridge.ethiopia.test <- cv.glmnet(X.ethiopia.nomods, Y.ethiopia, alpha = 0, lambda = grid.ridge.ethiopia)
 plot(ridge.ethiopia.test)
 ridge.ethiopia.nomodel <- predict(ridge.ethiopia.test, type = "coefficients", s = ridge.ethiopia.test$lambda.min)
-min(ridge.ethiopia.test$cvm)
+ridge.nomod.ethiopia.mse <- min(ridge.ethiopia.test$cvm)
 
 
 
@@ -941,7 +941,7 @@ lasso.ethiopia.nomodel <- cv.glmnet(X.ethiopia.nomods, Y.ethiopia, alpha = 1, la
 plot(lasso.ethiopia.nomodel)
 lasso.ethiopia.model.coef <- predict(lasso.ethiopia.nomodel, type = "coefficients", s = lasso.ethiopia.nomodel$lambda.min) %>%
   as.matrix()
-min(lasso.ethiopia.nomodel$cvm)
+lasso.nomod.ethiopia.mse <- min(lasso.ethiopia.nomodel$cvm)
 
 lasso.ethiopia.nomodel.vars <- rownames(lasso.ethiopia.model.coef)[lasso.ethiopia.model.coef != 0 &
                                                                      rownames(lasso.ethiopia.model.coef) != "(Intercept)"]
@@ -957,6 +957,19 @@ lasso_ddf_vars <- rownames(lasso_ddf_coeff)[lasso_ddf_coeff != 0 &
 lasso_ddf_vars
 lasso_ddf_vars_dropped <- rownames(lasso_ddf_coeff)[!rownames(lasso_ddf_coeff) %in% lasso_ddf_vars]
 lasso_ddf_vars_dropped
+
+lasso_ddf_predict <- predict(lasso_ddf)
+lasso_ddf_mse <- mean((Y.ethiopia - lasso_ddf_predict)^2)
+lasso_ddf_mse
+
+# now doing it without the model, just applying it straight up!
+
+lasso.ddf.ethiopia.nomodel <- rlasso(Y.ethiopia ~ X.ethiopia.nomods, post = FALSE)
+summary(lasso.ddf.ethiopia.nomodel)
+
+lasso_ddf_predict.nomodel <- predict(lasso.ddf.ethiopia.nomodel)
+lasso_ddf_mse.nomodel <- mean((Y.ethiopia - lasso_ddf_predict.nomodel)^2)
+lasso_ddf_mse.nomodel
 
 
 common_vars <- intersect(lasso_dd_vars, lasso_ddf_vars)
@@ -1012,6 +1025,55 @@ frequency_table
 observation_frequency
 
 
-lasso_ddf_predict <- predict(lasso_ddf)
-lasso_ddf_mse <- mean((Y.ethiopia - lasso_ddf_predict)^2)
-lasso_ddf_mse
+
+
+# collecting the mse values together:
+
+collected_variables.final <- c(Ridge.Minimum = ridge_cv_vars_min,
+                         Ridge.1se = ridge_cv_vars_1se,
+                         Lasso.Minimum = lasso_cv_vars,
+                         Lasso.1se = lasso_cv_vars_1se,
+                         Lasso.DataDriven = lasso_dd_vars,
+                         Random.Forest = rf_vars,
+                         Gradient.Boosted.Forest = gbf_vars,
+                         Model.Ridge = ridge_top_decile,
+                         Model.Lasso.Min = lasso.ethiopia.vars,
+                         Model.Lasso.DataDriven = lasso_ddf_vars)
+
+collected_variables_names.final <- list(
+  Senegal.Ridge.Minimum = ridge_cv_vars_min,
+  Senegal.Ridge.1se = ridge_cv_vars_1se,
+  Senegal.Lasso.Minimum = lasso_cv_vars,
+  Senegal.Lasso.1se = lasso_cv_vars_1se,
+  Senegal.Lasso.DataDriven = lasso_dd_vars,
+  Senegal.Random.Forest = rf_vars,
+  Senegal.Gradient.Boosted.Forest = gbf_vars,
+  Ethiopia.Model.Ridge = ridge_top_decile,
+  Ethiopia.Model.Lasso.Min = lasso.ethiopia.vars,
+  Ethiopia.Model.Lasso.DataDriven = lasso_ddf_vars,
+  Ethiopia.No.Model.Ridge = ridge.nomod.ethiopia.mse,
+  Ethiopia.No.Model.Lasso.Min = lasso.nomod.ethiopia.mse,
+  Ethiopia.No.Model.Lasso.DataDriven = lasso_ddf_mse.nomodel
+)
+
+collected_MSE.final <- list(ridge_mse_min,
+                      ridge_mse_1se,
+                      lasso_mse_min,
+                      lasso_mse_1se,
+                      lasso_dd_mse,
+                      rf_mse,
+                      boost_mse,
+                      min.ridge.ethiopia.mse,
+                      min.lasso.ethiopia.mse,
+                      lasso_ddf_mse,
+                      ridge.nomod.ethiopia.mse,
+                      lasso.nomod.ethiopia.mse,
+                      lasso_ddf_mse.nomodel
+)
+
+mse_comparison.final <- tibble(Method = names(collected_variables_names.final),
+                         MSE = collected_MSE.final) 
+
+mse_comparison.final$MSE <- as.numeric(mse_comparison.final$MSE)
+
+mse_comparison.final
