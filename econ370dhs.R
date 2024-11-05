@@ -13,6 +13,9 @@
 # install.packages("gbm")
 # install.packages("rpart")
 # install.packages("rpart.plot")
+# install.packages("webshot")
+# webshot::install_phantomjs()
+
 
 library(tidyverse)
 library(haven)
@@ -26,6 +29,8 @@ library(grf)
 library(broom)
 library(ggplot2)
 library(gridExtra)
+library(knitr)
+library(kableExtra)
 
 #ridge & lasso
 library(glmnet)
@@ -1077,3 +1082,13 @@ mse_comparison.final <- tibble(Method = names(collected_variables_names.final),
 mse_comparison.final$MSE <- as.numeric(mse_comparison.final$MSE)
 
 mse_comparison.final
+
+table_html <- mse_comparison.final %>%
+  kable("html", table.attr = "style='width:auto; border-collapse: collapse;'") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = FALSE)
+
+# Save as HTML or Word
+save_kable(table_html, "mse_comparison.html")
+
+# Optionally, convert HTML to a PNG image
+webshot::webshot("mse_comparison.html", "mse_comparison.png")
