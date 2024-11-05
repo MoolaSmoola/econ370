@@ -38,20 +38,19 @@ library(gitcreds)
 #pca()
 
 ##Benet File Path
-#mypath <- "~/ECON370/ECON370dhs/econ370 project/"
-
-#senegal.dhs <- read_dta(paste0(mypath, "SNBR7IDT/SNBR7IDT/SNBR7IFL.dta")) %>% 
-  #filter(!is.na(midx)) %>% 
-  #filter(b5 == 1) %>% # Child is alive
-  #filter(v135 == 1) # Usual resident or visitor of Senegal
+mypath <- "~/ECON370/ECON370dhs/econ370 project/"
+senegal.dhs <- read_dta(paste0(mypath, "SNBR7IDT/SNBR7IDT/SNBR7IFL.dta")) %>% 
+  filter(!is.na(midx)) %>% 
+  filter(b5 == 1) %>% # Child is alive
+  filter(v135 == 1) # Usual resident or visitor of Senegal
 
 ##Weiran File Path
-mypath<- "/Users/weiran/Data\ Science\ in\ Econ/PredictingInfantProject/Econ370Project2/"
+#mypath<- "/Users/weiran/Data\ Science\ in\ Econ/PredictingInfantProject/Econ370Project2/"
 
-senegal.dhs <- read_dta(paste0(mypath, "SNBR7IFL.DTA")) %>% 
-  filter(!is.na(midx)) %>% 
-  filter(b5 == 1) %>% 
-  filter(v135 == 1)
+#senegal.dhs <- read_dta(paste0(mypath, "SNBR7IFL.DTA")) %>% 
+ # filter(!is.na(midx)) %>% 
+ # filter(b5 == 1) %>% 
+ # filter(v135 == 1)
 
 ##Clean Dataset
 senegal.data <- senegal.dhs %>% 
@@ -588,12 +587,12 @@ ethiopia.dhs <- read_dta(paste0(mypath, "Ethiopia2016/ETBR71FL.dta")) %>%
   filter(v135 == 1) # Usual resident or visitor of Ethiopia
 
 #Weiran Filepath
-mypath <- "/Users/weiran/Data\ Science\ in\ Econ/PredictingInfantProject/Econ370Project2/Ethiopia2016/"
+#mypath <- "/Users/weiran/Data\ Science\ in\ Econ/PredictingInfantProject/Econ370Project2/Ethiopia2016/"
 
-ethiopia.dhs <- read_dta(paste0(mypath, "ETBR71FL.DTA")) %>% 
-  filter(!is.na(midx)) %>% 
-  filter(b5 == 1) %>% # Child is alive
-  filter(v135 == 1) # Usual resident or visitor of Ethiopia
+#ethiopia.dhs <- read_dta(paste0(mypath, "ETBR71FL.DTA")) %>% 
+#  filter(!is.na(midx)) %>% 
+#  filter(b5 == 1) %>% # Child is alive
+ # filter(v135 == 1) # Usual resident or visitor of Ethiopia
 
 ethiopia.data <- ethiopia.dhs %>% 
   select(hw70, hw1, bord, b0, b1, b2, b4, b11, 
@@ -977,6 +976,36 @@ comparison_table <- tibble(
 table_plot <- tableGrob(comparison_table)
 table_plot
 ggsave("data_frame_table.png", plot = table_plot, width = 18, height = 40, dpi = 300)
+
+table_plot <- tableGrob(comparison_table, theme = ttheme_default(base_size = 16))
+ggsave("data_frame_table.png", plot = table_plot, width = 24, height = 50, dpi = 300, limitsize = FALSE)
+
+model_vars <- c(comparison_table$Senegal.Lasso.DD.Variables,
+                comparison_table$Ethiopia.Lasso.DD.Variables,
+                comparison_table$Dropped.DD.Variables,
+                comparison_table$Senegal.Lasso.Min.Variables,
+                comparison_table$Ethiopia.Lasso.Min.Variables,
+                comparison_table$Dropped.Lasso.Min.Variables,
+                comparison_table$Ridge.TopDecile.Variables)
+
+vars_df <- comparison_table %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "Model",
+    values_to = "Variable"
+  ) %>%
+  drop_na(Variable)  # Remove NA values to keep only actual variables
+
+frequency_table <- vars_df %>%
+  count(Model, Variable) %>%
+  pivot_wider(names_from = Model, values_from = n, values_fill = 0)
+
+observation_frequency <- vars_df %>%
+  count(Variable, name = "Frequency") %>%
+  arrange(desc(Frequency))
+
+frequency_table
+observation_frequency
 
 
 lasso_ddf_predict <- predict(lasso_ddf)
