@@ -327,57 +327,6 @@ for (i in 1:3) {
           xlab = "Variables")
 }  
 
-##Most important loadings:
-# Extract loadings for the first three principal components
-loadings <- pca_result$rotation[, 1:3]
-
-# Find the top 10 variables with the highest absolute loadings for PC1
-top_pc1_loadings <- sort(abs(loadings[, 1]), decreasing = TRUE)[1:10]
-top_pc1_variables <- names(top_pc1_loadings)
-
-# Find the top 10 variables with the highest absolute loadings for PC2
-top_pc2_loadings <- sort(abs(loadings[, 2]), decreasing = TRUE)[1:10]
-top_pc2_variables <- names(top_pc2_loadings)
-
-# Find the top 10 variables with the highest absolute loadings for PC3
-top_pc3_loadings <- sort(abs(loadings[, 3]), decreasing = TRUE)[1:10]
-top_pc3_variables <- names(top_pc3_loadings)
-
-# Print results for each principal component
-cat("Top 10 significant variables for PC1:\n")
-print(data.frame(Variable = top_pc1_variables, Loading = loadings[top_pc1_variables, 1]))
-
-cat("\nTop 10 significant variables for PC2:\n")
-print(data.frame(Variable = top_pc2_variables, Loading = loadings[top_pc2_variables, 2]))
-
-cat("\nTop 10 significant variables for PC3:\n")
-print(data.frame(Variable = top_pc3_variables, Loading = loadings[top_pc3_variables, 3]))
-
-## Scatterplot
-# Create a data frame with the first two principal components
-pca_data <- data.frame(PC1 = pca_result$x[, 1], 
-                       PC2 = pca_result$x[, 2])
-
-# Perform k-means clustering on PC1 and PC2 with a chosen number of clusters (e.g., 3)
-# You can change the number of clusters (centers) as needed
-set.seed(8675309)
-kmeans_result <- kmeans(pca_data, centers = 3)  # Adjust centers to your needs
-
-# Add the cluster assignments to the data frame
-pca_data$Cluster <- factor(kmeans_result$cluster)
-
-# Plot PC1 vs. PC2 with color representing clusters
-library(ggplot2)
-
-ggplot(pca_data, aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(size = 2, alpha = 0.7) +
-  labs(title = "PC1 vs. PC2 Scatter Plot with k-means Clustering",
-       x = "Principal Component 1 (PC1)",
-       y = "Principal Component 2 (PC2)") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  scale_color_brewer(palette = "Set1")  # Change color palette as desired
-
 
 ##### PREPARE DATA --------------------------------------
 
@@ -582,49 +531,6 @@ yhat_boost <- predict(senegal_boost,
 boost_mse = mean((yhat_boost - haz_test)^2)
 boost_mse
 
-library(gbm)
-
-# Initialize vectors to store results
-results <- data.frame()
-
-# Define parameter ranges
-n_trees_list <- c(1000, 2000, 3000, 4000, 5000)
-interaction_depth_list <- c(1, 2, 3, 4, 5)
-shrinkage_list <- c(0.001, 0.01, 0.1)
-n_minobsinnode_list <- c(5, 10, 20)
-
-# Nested loops to try each combination
-for (n_trees in n_trees_list) {
-  for (interaction_depth in interaction_depth_list) {
-    for (shrinkage in shrinkage_list) {
-      for (n_minobsinnode in n_minobsinnode_list) {
-        set.seed(8675309)
-        
-        # Train the model
-        gbm_model <- gbm(haz ~ ., data = senegal.data[train, ], 
-                         distribution = "gaussian", n.trees = n_trees,
-                         interaction.depth = interaction_depth, 
-                         shrinkage = shrinkage, 
-                         n.minobsinnode = n_minobsinnode, 
-                         verbose = FALSE)
-        
-        # Calculate MSE on test data
-        yhat_boost <- predict(gbm_model, newdata = senegal.data[-train, ], n.trees = n_trees)
-        mse <- mean((yhat_boost - haz_test)^2)
-        
-        # Store the results
-        results <- rbind(results, data.frame(n_trees, interaction_depth, shrinkage, n_minobsinnode, mse))
-      }
-    }
-  }
-}
-
-# Find the best parameters based on the lowest MSE
-best_params <- results[which.min(results$mse), ]
-print(best_params)
-
-# Print best parameters and results
-print(gbm_tuned)
 
 ##### PRINCIPAL COMPONENT ANALYSIS  ---------------------
 
@@ -947,7 +853,7 @@ ridge_top_decile <- ridge_top_decile$Variable  # Convert to a character vector i
 
 # Select columns in ethiopia.data based on ridge_top_decile and exclude those starting with "region_" or "ethnicity_"
 X.ethiopia.ridge <- ethiopia.data %>%
-  select(-haz) %>%                                # Exclude the 'haz' column
+  select(-haz, age_months) %>%                                # Exclude the 'haz' column
   select(any_of(ridge_top_decile)) %>%            # Select only columns in ridge_top_decile
   select(-matches("^(region_|ethnicity_)")) %>%   # Exclude columns starting with "region_" or "ethnicity_"
   cbind(ethiopia.data %>% 
@@ -956,7 +862,7 @@ X.ethiopia.ridge <- ethiopia.data %>%
 
 
 X.ethiopia.lasso <- ethiopia.data %>% 
-  select(!c(haz)) %>%
+  select(!c(haz, age_months)) %>%
   select(any_of(lasso_cv_vars)) %>% ##### these are the variables chosen by lasso with lambda.min
   select(-matches("^(region_|ethnicity_)")) %>%
   cbind(ethiopia.data %>% 
@@ -1007,7 +913,6 @@ ridge.ethiopia.test <- cv.glmnet(X.ethiopia.nomods, Y.ethiopia, alpha = 0, lambd
 plot(ridge.ethiopia.test)
 ridge.ethiopia.nomodel <- predict(ridge.ethiopia.test, type = "coefficients", s = ridge.ethiopia.test$lambda.min)
 ridge.nomod.ethiopia.mse <- min(ridge.ethiopia.test$cvm)
-
 
 
 
@@ -1152,7 +1057,8 @@ collected_variables_names.final <- list(
   Ethiopia.Model.Lasso.DataDriven = lasso_ddf_vars,
   Ethiopia.No.Model.Ridge = ridge.nomod.ethiopia.mse,
   Ethiopia.No.Model.Lasso.Min = lasso.nomod.ethiopia.mse,
-  Ethiopia.No.Model.Lasso.DataDriven = lasso_ddf_mse.nomodel
+  Ethiopia.No.Model.Lasso.DataDriven = lasso_ddf_mse.nomodel,
+  Ethiopia.OLS = ethiopia.ols.mse
 )
 
 collected_MSE.final <- list(ridge_mse_min,
@@ -1167,7 +1073,8 @@ collected_MSE.final <- list(ridge_mse_min,
                       lasso_ddf_mse,
                       ridge.nomod.ethiopia.mse,
                       lasso.nomod.ethiopia.mse,
-                      lasso_ddf_mse.nomodel
+                      lasso_ddf_mse.nomodel,
+                      ethiopia.ols.mse
 )
 
 mse_comparison.final <- tibble(Method = names(collected_variables_names.final),
@@ -1186,3 +1093,20 @@ save_kable(table_html, "mse_comparison.html")
 
 # Optionally, convert HTML to a PNG image
 webshot::webshot("mse_comparison.html", "mse_comparison.png")
+
+final.model.variables <- tibble(Variables = lasso.ethiopia.vars)
+
+table.variables.html <- final.model.variables %>%
+  kable("html", table.attr = "style='width:auto; border-collapse: collapse;'") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = FALSE)
+
+# Save as HTML or Word
+save_kable(table.variables.html, "lasso_variables.html")
+
+# Optionally, convert HTML to a PNG image
+webshot::webshot("lasso_variables.html", "lasso_variables.png")
+
+
+lasso.ethiopia.vars
+lasso_ddf_vars
+
